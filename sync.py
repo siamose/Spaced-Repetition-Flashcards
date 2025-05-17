@@ -12,34 +12,29 @@ openai = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
 notion = Client(auth=os.getenv("NOTION_TOKEN"))
 DB_ID = os.getenv("NOTION_DB")
 
+MAX_CHARS = 2000  # Notion rich_text の上限
 
+#  Utility 
 def clean(text) -> str:
-    """
-    - HTML を除去
-    - list/dict/None を安全に文字列へ変換
-    - 連続改行 > 2 行 を 2 行に整形
-    """
     if text is None:
         return ""
     if isinstance(text, (list, tuple)):
         text = " ".join(map(str, text))
     elif not isinstance(text, str):
         text = str(text)
-
     try:
         plain = BeautifulSoup(text, "html.parser").get_text()
     except Exception:
-        plain = text  # 解析失敗時はそのまま使う
-
+        plain = text
     return re.sub(r"\n{3,}", "\n\n", plain)
 
-
+#  GPT でメタ情報生成 
 def gpt_meta(q: str, a: str) -> dict:
     prompt = f"""以下のQとAを読み、次のJSONで答えて:
 {{
 "title": "20文字以内の要約",
 "topic": ["3語以内トピック"],
-"difficulty": "★|★★|★★★"
+"difficulty": "||"
 }}
 
 Q:{q}
@@ -51,46 +46,43 @@ A:{a}"""
     )
     return json.loads(res.choices[0].message.content)
 
-
-def export_pairs() -> list[tuple[str, str]]:
+#  Export JSON  Q&A ペア 
+def export_pairs():
     with open("inbox/conversations.json", encoding="utf-8") as f:
         data = json.load(f)
 
-    pairs: list[tuple[str, str]] = []
-    cur_q: str | None = None
-
+    pairs, cur_q = [], None
     for conv in data:
         for node in conv["mapping"].values():
-            # ① message が存在しないノードはスキップ
             message = node.get("message")
             if message is None:
                 continue
-
             role = message.get("author", {}).get("role")
             parts = (message.get("content") or {}).get("parts") or []
             if not parts:
                 continue
-            txt = parts[0]       # 文字列以外の可能性をclean()で吸収
+            txt = parts[0]
 
             if role == "user":
                 cur_q = clean(txt)
             elif role == "assistant" and cur_q:
                 pairs.append((cur_q, clean(txt)))
                 cur_q = None
-
     return pairs
 
+#  Notion へ送信（children 分割版） 
+def send_to_notion(q: str, a: str, meta: dict):
+    first_chunk = a[:MAX_CHARS]
 
-def send_to_notion(q: str, a: str, meta: dict) -> None:
-    notion.pages.create(
+    page = notion.pages.create(
         parent={"database_id": DB_ID},
         properties={
             "Title": {"title": [{"text": {"content": meta["title"]}}]},
-            "Question": {"rich_text": [{"text": {"content": q}}]},
-            "Answer": {"rich_text": [{"text": {"content": a}}]},
-            "Topic": {"multi_select": [{"name": t} for t in meta["topic"]]},
+            "Question": {"rich_text": [{"text": {"content": q[:MAX_CHARS]}}]},
+            "Answer":   {"rich_text": [{"text": {"content": first_chunk}}]},
+            "Topic":    {"multi_select": [{"name": t} for t in meta["topic"]]},
             "Difficulty": {"select": {"name": meta["difficulty"]}},
-            "Status": {"select": {"name": "🆕 New"}},
+            "Status":   {"select": {"name": "🆕 New"}},
             "Last Reviewed": {
                 "date": {"start": datetime.now(timezone.utc).isoformat()}
             },
@@ -98,9 +90,21 @@ def send_to_notion(q: str, a: str, meta: dict) -> None:
         },
     )
 
+    remainder = a[MAX_CHARS:]
+    if remainder:
+        chunks = [remainder[i:i+MAX_CHARS] for i in range(0, len(remainder), MAX_CHARS)]
+        children = [{
+            "object": "block",
+            "type": "paragraph",
+            "paragraph": {
+                "rich_text": [{"type": "text", "text": {"content": ch}}]
+            }
+        } for ch in chunks]
+        notion.blocks.children.append(block_id=page["id"], children=children)
 
+#  Main 
 if __name__ == "__main__":
     for q_text, a_text in export_pairs():
         meta_info = gpt_meta(q_text, a_text)
         send_to_notion(q_text, a_text, meta_info)
-        print("→", meta_info["title"])
+        print("", meta_info["title"])
