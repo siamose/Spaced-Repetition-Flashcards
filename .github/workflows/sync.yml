@@ -1,0 +1,16 @@
+
+- `inbox/conversations.json` に ChatGPT の **Export data** で得た JSON を置く想定  
+- 1 スクリプトで **要約 + メタ付け + Notion 送信** 完結  
+- 1 回で大量生成する場合は `time.sleep(1)` を挟みレート制限に注意
+
+---
+
+## 5️⃣ GitHub Actions で自動実行
+
+### 5-1. リポジトリを初期化
+
+```bash
+git init
+echo -e "inbox/\n.env" >> .gitignore
+git add .
+git commit -m "first commit"
