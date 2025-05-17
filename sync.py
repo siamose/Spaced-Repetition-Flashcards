@@ -1,6 +1,4 @@
-import os
-import json
-import re
+﻿import os, json, re
 from datetime import datetime, timezone
 
 from bs4 import BeautifulSoup
@@ -8,9 +6,6 @@ from dotenv import load_dotenv
 from notion_client import Client
 from openai import OpenAI
 
-# ────────────────────────────────
-# 環境変数の読み込み
-# ────────────────────────────────
 load_dotenv()
 
 openai = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
@@ -18,18 +13,12 @@ notion = Client(auth=os.getenv("NOTION_TOKEN"))
 DB_ID = os.getenv("NOTION_DB")
 
 
-# ────────────────────────────────
-# Utility
-# ────────────────────────────────
 def clean(text: str) -> str:
     """HTMLタグを除去し、連続改行を2行に整形"""
     return re.sub(r"\n{3,}", "\n\n",
                   BeautifulSoup(text, "html.parser").get_text())
 
 
-# ────────────────────────────────
-# OpenAI でメタ情報生成
-# ────────────────────────────────
 def gpt_meta(q: str, a: str) -> dict:
     prompt = f"""以下のQとAを読み、次のJSONで答えて:
 {{
@@ -48,9 +37,6 @@ A:{a}"""
     return json.loads(res.choices[0].message.content)
 
 
-# ────────────────────────────────
-# ChatGPT Export JSON → Q&A ペア抽出
-# ────────────────────────────────
 def export_pairs() -> list[tuple[str, str]]:
     with open("inbox/conversations.json", encoding="utf-8") as f:
         data = json.load(f)
@@ -69,9 +55,6 @@ def export_pairs() -> list[tuple[str, str]]:
     return pairs
 
 
-# ────────────────────────────────
-# Notion へ書き込み
-# ────────────────────────────────
 def send_to_notion(q: str, a: str, meta: dict) -> None:
     notion.pages.create(
         parent={"database_id": DB_ID},
@@ -90,9 +73,6 @@ def send_to_notion(q: str, a: str, meta: dict) -> None:
     )
 
 
-# ────────────────────────────────
-# エントリーポイント
-# ────────────────────────────────
 if __name__ == "__main__":
     for q_text, a_text in export_pairs():
         meta_info = gpt_meta(q_text, a_text)
