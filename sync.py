@@ -1,4 +1,4 @@
-import os, json, re
+ï»¿import os, json, re
 from datetime import datetime, timezone
 
 from bs4 import BeautifulSoup
@@ -12,7 +12,7 @@ openai = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
 notion = Client(auth=os.getenv("NOTION_TOKEN"))
 DB_ID = os.getenv("NOTION_DB")
 
-MAX_CHARS = 2000  # Notion rich_text ‚ÌãŒÀ
+MAX_CHARS = 2000  # Notion rich_text ã®ä¸Šé™
 
 #  Utility 
 def clean(text) -> str:
@@ -28,12 +28,12 @@ def clean(text) -> str:
         plain = text
     return re.sub(r"\n{3,}", "\n\n", plain)
 
-#  GPT ‚Åƒƒ^î•ñ¶¬ 
+#  GPT ã§ãƒ¡ã‚¿æƒ…å ±ç”Ÿæˆ 
 def gpt_meta(q: str, a: str) -> dict:
-    prompt = f"""ˆÈ‰º‚ÌQ‚ÆA‚ğ“Ç‚İAŸ‚ÌJSON‚Å“š‚¦‚Ä:
+    prompt = f"""ä»¥ä¸‹ã®Qã¨Aã‚’èª­ã¿ã€æ¬¡ã®JSONã§ç­”ãˆã¦:
 {{
-"title": "20•¶šˆÈ“à‚Ì—v–ñ",
-"topic": ["3ŒêˆÈ“àƒgƒsƒbƒN"],
+"title": "20æ–‡å­—ä»¥å†…ã®è¦ç´„",
+"topic": ["3èªä»¥å†…ãƒˆãƒ”ãƒƒã‚¯"],
 "difficulty": "||"
 }}
 
@@ -46,7 +46,7 @@ A:{a}"""
     )
     return json.loads(res.choices[0].message.content)
 
-#  Export JSON  Q&A ƒyƒA 
+#  Export JSON  Q&A ãƒšã‚¢ 
 def export_pairs():
     with open("inbox/conversations.json", encoding="utf-8") as f:
         data = json.load(f)
@@ -70,7 +70,7 @@ def export_pairs():
                 cur_q = None
     return pairs
 
-#  Notion ‚Ö‘—Michildren •ªŠ„”Åj 
+#  Notion ã¸é€ä¿¡ï¼ˆchildren åˆ†å‰²ç‰ˆï¼‰ 
 def send_to_notion(q: str, a: str, meta: dict):
     first_chunk = a[:MAX_CHARS]
 
