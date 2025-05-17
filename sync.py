@@ -136,6 +136,35 @@ def send_to_notion(q: str, a: str, meta: dict):
         for i in range(0, len(children), 50):
             notion.blocks.children.append(block_id=page["id"], children=children[i:i+50])
 
+# ❶ ヘルパー関数を追加
+import urllib.parse, re
+
+def resolve_db_id(raw: str) -> str:
+    """
+    - 32桁ならそのまま
+    - ハイフン入り36桁なら削除
+    - URLなら path 末尾 or - 区切りを抽出
+    """
+    raw = raw.strip()
+    if re.fullmatch(r"[0-9a-fA-F]{32}", raw):
+        return raw.lower()
+    if re.fullmatch(r"[0-9a-fA-F\-]{36}", raw):
+        return raw.replace("-", "").lower()
+
+    # URL の場合
+    parsed = urllib.parse.urlparse(raw)
+    path = parsed.path.rstrip("/")
+    last = path.split("/")[-1]          # slug-UUID または純 UUID
+    last = last.split("-")[-1] if "-" in last else last
+    if re.fullmatch(r"[0-9a-fA-F]{32}", last):
+        return last.lower()
+    raise ValueError("Not a valid Notion URL / UUID")
+
+# ❷ 取得した DB_ID に適用
+DB_ID_RAW = os.getenv("NOTION_DB")
+DB_ID = resolve_db_id(DB_ID_RAW)
+
+
 # ─── Main ────────────────────────────────────────────
 if __name__ == "__main__":
     for q, a in export_pairs():
