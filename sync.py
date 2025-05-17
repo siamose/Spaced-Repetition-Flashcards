@@ -41,17 +41,28 @@ def export_pairs() -> list[tuple[str, str]]:
     with open("inbox/conversations.json", encoding="utf-8") as f:
         data = json.load(f)
 
-    pairs, cur_q = [], None
+    pairs: list[tuple[str, str]] = []
+    cur_q: str | None = None
+
     for conv in data:
         for node in conv["mapping"].values():
-            role = node.get("author", {}).get("role")
-            txt = node.get("message", {}).get("content", {}).get("parts", [""])[0]
+            # ① message が存在しないノードはスキップ
+            message = node.get("message")
+            if message is None:
+                continue
+
+            role = message.get("author", {}).get("role")
+            parts = message.get("content", {}).get("parts", [])
+            if not parts:
+                continue  # 空メッセージは無視
+            txt = parts[0]
 
             if role == "user":
                 cur_q = clean(txt)
             elif role == "assistant" and cur_q:
                 pairs.append((cur_q, clean(txt)))
                 cur_q = None
+
     return pairs
 
 
