@@ -13,10 +13,25 @@ notion = Client(auth=os.getenv("NOTION_TOKEN"))
 DB_ID = os.getenv("NOTION_DB")
 
 
-def clean(text: str) -> str:
-    """HTMLタグを除去し、連続改行を2行に整形"""
-    return re.sub(r"\n{3,}", "\n\n",
-                  BeautifulSoup(text, "html.parser").get_text())
+def clean(text) -> str:
+    """
+    - HTML を除去
+    - list/dict/None を安全に文字列へ変換
+    - 連続改行 > 2 行 を 2 行に整形
+    """
+    if text is None:
+        return ""
+    if isinstance(text, (list, tuple)):
+        text = " ".join(map(str, text))
+    elif not isinstance(text, str):
+        text = str(text)
+
+    try:
+        plain = BeautifulSoup(text, "html.parser").get_text()
+    except Exception:
+        plain = text  # 解析失敗時はそのまま使う
+
+    return re.sub(r"\n{3,}", "\n\n", plain)
 
 
 def gpt_meta(q: str, a: str) -> dict:
@@ -52,10 +67,10 @@ def export_pairs() -> list[tuple[str, str]]:
                 continue
 
             role = message.get("author", {}).get("role")
-            parts = message.get("content", {}).get("parts", [])
+            parts = (message.get("content") or {}).get("parts") or []
             if not parts:
-                continue  # 空メッセージは無視
-            txt = parts[0]
+                continue
+            txt = parts[0]       # 文字列以外の可能性をclean()で吸収
 
             if role == "user":
                 cur_q = clean(txt)
