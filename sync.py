@@ -24,8 +24,6 @@ OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")
 NOTION_TOKEN   = os.getenv("NOTION_TOKEN")
 DB_ID          = os.getenv("NOTION_DB")
 
-if not re.fullmatch(r"[0-9a-f]{32}", (DB_ID or "").lower()):
-    raise RuntimeError("NOTION_DB は ハイフン無し32桁のデータベースIDを Secrets に設定してください。")
 
 
 if not all([OPENAI_API_KEY, NOTION_TOKEN, DB_ID]):
